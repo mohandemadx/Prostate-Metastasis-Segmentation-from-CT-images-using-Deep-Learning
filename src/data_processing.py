@@ -14,34 +14,55 @@ Contributions:
 import numpy as np
 import pydicom
 import os
-import src
+import torch
+from utils import map_contour_to_image
 
 def load_dicom(dir):
-    """
-    Load DICOM files from the given directory and return them as a stacked matrix.
-    Args:
-        dir (str): Path to the directory containing DICOM files.
-    Returns:
-        np.array: Matrix of flattened DICOM images.
-    """
-    dicom_images = []
-    for filename in os.listdir(dir):
-        if filename.endswith('.dcm'):
-            file_path = os.path.join(dir, filename)
-            dicom_image = pydicom.dcmread(file_path)
-            dicom_images.append(dicom_image.pixel_array)  # Access the pixel data
-
-    # Flatten each image and stack into a matrix
-    image_matrix = np.vstack([image.flatten() for image in dicom_images])
+    # Get a list of DICOM file paths in the directory
+    dicom_files = [os.path.join(dir, f) for f in os.listdir(dir) if f.endswith('.dcm')]
     
-    return image_matrix, dicom_images
+    if not dicom_files:
+        raise ValueError("No DICOM files found in the directory")
+
+    # Load the first image to determine (H, W)
+    first_image = pydicom.dcmread(dicom_files[0])
+    H, W = first_image.pixel_array.shape
+    D = len(dicom_files)
+    C = 1  # Grayscale
+
+    # Initialize the array for DICOM images
+    dicom_images = np.empty((D, C, H, W), dtype=first_image.pixel_array.dtype)
+    image_data = []
+
+    # Load each DICOM image into the preallocated array
+    for i, file_path in enumerate(dicom_files):
+        dicom_image = pydicom.dcmread(file_path)
+        uid = dicom_image.SOPInstanceUID
+        image_position = dicom_image.ImagePositionPatient  # (X0, Y0, Z0) position in patient coordinates
+        image_orientation = dicom_image.ImageOrientationPatient  # (Xr, Yr, Zr, Xc, Yc, Zc) row and column direction cosines
+        pixel_spacing = dicom_image.PixelSpacing 
+        image_data.append({
+                        "SliceIndex": i,
+                        "UID": uid,
+                        "ImagePosition": image_position,
+                        "ImageOrientation": image_orientation,
+                        "PixelSpacing": pixel_spacing
+                    })  
+        
+        # Add the image data to the array, with a channel dimension
+        dicom_images[i, 0, :, :] = dicom_image.pixel_array
+
+    # Convert the NumPy array to a PyTorch tensor
+    image_tensor = torch.from_numpy(dicom_images)
+
+    return image_tensor, image_data
 
 
-# Function to extract prostate contour information from RTSTRUCT FILE
-def extract_prostate_contour(file, dicom_images):
-    prostate_contours = []
-    
-    rtstruct = pydicom.dcmread(file)
+# Function to extract prostate contour information
+def extract_prostate_contour(rtstruct_path, image_data):
+    contours_data = []
+    contours = []
+    rtstruct = pydicom.dcmread(rtstruct_path)
     
     # Step 1: Find the ROI corresponding to the "Prostate"
     for roi in rtstruct.StructureSetROISequence:
@@ -52,40 +73,40 @@ def extract_prostate_contour(file, dicom_images):
     else:
         raise ValueError("Prostate ROI not found in the RTSTRUCT file.")
 
-    # Step 2: Find the corresponding contours for the prostate ROI
     for roi_contour in rtstruct.ROIContourSequence:
         if roi_contour.ReferencedROINumber == prostate_roi_number:
-            # Step 3: Extract ContourImageSequence for the prostate contours
             for contour in roi_contour.ContourSequence:
-                # Each contour might be associated with a different image slice
-                for image_sequence in contour.ContourImageSequence:
-                    ref = image_sequence.ReferencedSOPInstanceUID
-                    contour_points = contour.ContourData
-                    number_of_points = contour.NumberOfContourPoints
-                    
-                    # # Ensure the DICOM image exists
-                    # if ref not in dicom_images:
-                    #     raise ValueError(f"DICOM image with SOPInstanceUID {ref} not found.")
-                    
-                    # Extract relevant DICOM image info
-                    dicom_image = dicom_images[ref]
-                    image_position = dicom_image.ImagePositionPatient  # (X0, Y0, Z0) position in patient coordinates
-                    image_orientation = dicom_image.ImageOrientationPatient  # (Xr, Yr, Zr, Xc, Yc, Zc) row and column direction cosines
-                    pixel_spacing = dicom_image.PixelSpacing  # [row_spacing, column_spacing]
-                    index = dicom_image.InstanceNumber
-                    
-                    # Map the contour points to image coordinates
-                    image_coordinates = map_contour_to_image(contour_points, image_position, image_orientation, pixel_spacing)
-                    
-                    prostate_contours.append({
-                        "Ref": ref,
-                        "ImageSequence": image_sequence,
-                        "ContourData": contour_points,
-                        "NumberOfPoints": number_of_points,
-                        "ContourPixelData": image_coordinates
-                    })
+                # Directly access the first entry in ContourImageSequence
+                image_sequence = contour.ContourImageSequence[0]
+                uid = image_sequence.ReferencedSOPInstanceUID  # Directly get the first UID
+                contour_points = contour.ContourData
+                number_of_points = contour.NumberOfContourPoints
+                
+                index = next((i for i, item in enumerate(image_data) if item["UID"] == uid), None)
+                
+                if index is None:
+                    raise ValueError(f"DICOM image with SOPInstanceUID {uid} not found.")
+                
+                # Extract relevant DICOM image info
+                data = image_data[index]
+                image_position = data['ImagePosition'] # (X0, Y0, Z0) position in patient coordinates
+                image_orientation = data['ImageOrientation']  # (Xr, Yr, Zr, Xc, Yc, Zc) row and column direction cosines
+                pixel_spacing = data['PixelSpacing']  # [row_spacing, column_spacing]
+
+                # Map the contour points to image coordinates
+                image_coordinates = map_contour_to_image(contour_points, image_position, image_orientation, pixel_spacing)
+                
+                # Store or process the contour data as needed
+                contours_data.append({
+                    "UID": uid,
+                    "index": index,
+                    "ContourData": contour_points,
+                    "NumberOfPoints": number_of_points,
+                    "ContourPixelData": image_coordinates
+                })
+                contours.insert(index, image_coordinates)
     
-    return prostate_contours, index
+    return contours, contours_data
 
 
 def create_mask(contour, rows, columns):
