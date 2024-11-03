@@ -5,8 +5,6 @@ image_dir = 'Prostate Dataset/Prostate-AEC-001/11-17-1992-NA-RX SIMULATION-82988
 
 
 # Load the DICOM images and find the index of the reference image
-image_tensor, image_data = dp.load_dicom(image_dir)
+image_data = dp.load_dicom(image_dir)
 
 
-print("Image matrix shape:", image_tensor.shape)
-print("Index of reference image:", image_data)
