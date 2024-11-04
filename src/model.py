@@ -12,12 +12,11 @@ Contributions:
 # Main Logic 
 import torch.nn as nn
 import torch
-import matplotlib.pyplot as plt
 
 
-class Unet():
+class Unet(nn.Module):
     """
-    input of the model: 4D tensor(nb of images, nb of chanels, height, width)
+    input of the model: 4D tensor (nb of images, nb of channels, height, width) (D,C,H,W)
     parametrs:
     output: 4D tensor of the segmented image
     """
@@ -135,12 +134,4 @@ class Unet():
         output = self.final_activation(self.final_conv(dec1))
         return output
     
-#initialize the model    
-model = Unet()
-print(model)
-
-random_image = torch.randn(1,1,1024,1024)
-print(random_image)
-out = model.forward(random_image)
-print(out)
 
