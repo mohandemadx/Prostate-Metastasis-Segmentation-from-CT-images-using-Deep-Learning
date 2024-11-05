@@ -13,9 +13,10 @@ Contributions:
 import torch.nn as nn
 import torch
 import matplotlib.pyplot as plt
+from monai.metrics import DiceMetric, HausdorffDistanceMetric
 
 
-class Unet():
+class Unet(nn.Module):
     """
     input of the model: 4D tensor(nb of images, nb of chanels, height, width)
     parametrs:
@@ -60,9 +61,13 @@ class Unet():
         self.final_conv = nn.Conv2d(32, 1, kernel_size=1)
         self.final_activation = nn.Sigmoid()
 
+        # Initialize metrics
+        self.dice_metric = DiceMetric(include_background=False, reduction="mean")
+        self.hausdorff_metric = HausdorffDistanceMetric(include_background=False, reduction="mean")
+
 
     def triple_conv(self, in_channels, out_channels, dropout_rate):
-        """Helper function to create tree convolutional layers with ReLU, BatchNorm, and optional Dropout."""
+        """Helper function to create three convolutional layers with ReLU, BatchNorm, and optional Dropout."""
         layers = [
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
@@ -134,6 +139,23 @@ class Unet():
         # Final segmentation output
         output = self.final_activation(self.final_conv(dec1))
         return output
+    
+    def evaluate(self, test_loader):
+        
+        # Model evaluation loop over test set
+        for x_batch, y_batch in test_loader:
+            y_pred = model(x_batch)
+            self.dice_metric(y_pred, y_batch)         
+            self.hausdorff_metric(y_pred, y_batch)    
+
+        # After the loop, get the final metric scores
+        dice_score = self.dice_metric.aggregate().item()
+        hausdorff_score = self.hausdorff_metric.aggregate().item()
+
+        return {
+            "Dice Coefficient": dice_score,
+            "Hausdorff Distance": hausdorff_score
+        }
     
 #initialize the model    
 model = Unet()
