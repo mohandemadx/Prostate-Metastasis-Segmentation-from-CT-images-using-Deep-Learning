@@ -12,13 +12,12 @@ Contributions:
 # Main Logic 
 import torch.nn as nn
 import torch
-import matplotlib.pyplot as plt
 from monai.metrics import DiceMetric, HausdorffDistanceMetric
 
 
-class Unet(nn.Module):
+class Unet(nn.Modulenn.Module):
     """
-    input of the model: 4D tensor(nb of images, nb of chanels, height, width)
+    input of the model: 4D tensor (nb of images, nb of channels, height, width) (D,C,H,W)
     parametrs:
     output: 4D tensor of the segmented image
     """
