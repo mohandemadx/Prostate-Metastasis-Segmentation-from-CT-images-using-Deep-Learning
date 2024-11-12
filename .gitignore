@@ -3,4 +3,8 @@
 /venv
 /.venv
 /Dataset
-/output_dir.zip
+*.zip
+/final_data_nii
+/temp
+/data_nii
+/augmented_data
