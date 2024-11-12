@@ -2,3 +2,5 @@
 /output_dir
 /venv
 /.venv
+/Dataset
+/output_dir.zip

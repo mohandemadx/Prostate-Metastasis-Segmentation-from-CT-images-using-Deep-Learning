@@ -15,7 +15,7 @@ import torch
 from monai.metrics import DiceMetric, HausdorffDistanceMetric
 
 
-class Unet(nn.Modulenn.Module):
+class Unet(nn.Module):
     """
     input of the model: 4D tensor (nb of images, nb of channels, height, width) (D,C,H,W)
     parametrs:
