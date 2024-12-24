@@ -8,3 +8,8 @@
 /temp
 /data_nii
 /augmented_data
+*.zip
+/final_data_nii
+/data_nii
+/augmented_data
+/temp
