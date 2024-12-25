@@ -47,7 +47,7 @@ Generate RT-STRUCT files from the segmentation results:
 ## How to Use
 1. Clone the repository:
    ```bash
-   git clone https://github.com/<username>/Prostate-Metastasis-Segmentation.git
+   git clone https://github.com/mohandemadx/Prostate-Metastasis-Segmentation-from-CT-images-using-Deep-Learning.git
    ```
 2. Install dependencies:
    ```bash
